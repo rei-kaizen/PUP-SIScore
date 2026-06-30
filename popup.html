@@ -59,12 +59,11 @@
       border-color: #8B0000;
     }
 
-    .or-divider {
-      text-align: center;
+    .note {
       font-size: 11px;
-      color: #bbb;
-      margin: 6px 0 10px;
-      user-select: none;
+      color: #888;
+      line-height: 1.4;
+      margin: -4px 0 14px;
     }
 
     .preview {
@@ -152,26 +151,18 @@
   <div class="body">
     <div class="field">
       <label>Total Score (%)</label>
-      <input type="number" id="scoreInput" placeholder="e.g. 77.33 — percentage (0–100)"
+      <input type="number" id="scoreInput" placeholder="e.g. 77.33"
              min="0" max="100" step="0.01">
     </div>
 
-    <div class="or-divider">— or select directly —</div>
-
-    <div class="field">
-      <label>Qualitative Description</label>
-      <select id="qualSelect">
-        <option value="">Choose a rating…</option>
-        <option value="5">5 — Always manifested (91–100%)</option>
-        <option value="4">4 — Often manifested (61–90%)</option>
-        <option value="3">3 — Sometimes manifested (31–60%)</option>
-        <option value="2">2 — Seldom manifested (11–30%)</option>
-        <option value="1">1 — Never / Rarely manifested (0–10%)</option>
-      </select>
-    </div>
+    <p class="note">
+      Note: each question only accepts whole-number ratings (1–5), so your
+      score is matched to the nearest achievable average. The exact result
+      is shown after you click Apply.
+    </p>
 
     <div class="preview" id="preview">
-      <span style="color:#bbb">Enter a score or pick a description above.</span>
+      <span style="color:#bbb">Enter your desired total score above.</span>
     </div>
 
     <div class="buttons">

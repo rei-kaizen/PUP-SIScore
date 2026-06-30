@@ -1,48 +1,35 @@
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.action === 'applyScore')  sendResponse(applyScore(msg.score));
-  if (msg.action === 'applyRating') sendResponse(applyUniform(msg.rating));
+  if (msg.action === 'applyScore') sendResponse(applyScore(msg.score));
   return true;
 });
 
-// --- Score-based: distribute floor/ceil values across questions ---
-
+// Distributes floor/ceil values across questions so the survey's own
+// average (avg × 20) lands as close as possible to the requested score.
 function applyScore(score) {
   const groups = getQuestionGroups();
   if (!groups.length) return noGroupsError();
 
   // Survey score formula: displayed% = avg × 20, so avg = score / 20.
   const avg = score / 20;
-
-  // Assign a shuffled mix of floor(avg) and ceil(avg) so the
-  // overall distribution reflects the exact decimal score.
   const values = distributeValues(groups.length, avg);
 
   let applied = 0;
+  let total = 0;
   groups.forEach((radios, i) => {
     const target = pickRadio(radios, values[i]);
-    if (target && !target.disabled) { fireClick(target); applied++; }
+    if (target && !target.disabled) {
+      fireClick(target);
+      applied++;
+      total += values[i];
+    }
   });
 
-  return applied > 0
-    ? { success: true, count: applied }
-    : { success: false, message: 'Could not select any radio buttons.' };
-}
+  if (applied === 0) {
+    return { success: false, message: 'Could not select any radio buttons.' };
+  }
 
-// --- Rating-based: same integer value for every question (dropdown / Randomize) ---
-
-function applyUniform(rating) {
-  const groups = getQuestionGroups();
-  if (!groups.length) return noGroupsError();
-
-  let applied = 0;
-  groups.forEach(radios => {
-    const target = pickRadio(radios, rating);
-    if (target && !target.disabled) { fireClick(target); applied++; }
-  });
-
-  return applied > 0
-    ? { success: true, count: applied }
-    : { success: false, message: 'Could not select any radio buttons.' };
+  const actualScore = Math.round((total / applied) * 20 * 100) / 100;
+  return { success: true, count: applied, actualScore };
 }
 
 // --- Helpers ---
