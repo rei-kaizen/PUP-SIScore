@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "PUP SIScore",
+  "version": "1.0",
+  "description": "Auto-select radio button ratings in the PUP Survey evaluation form.",
+  "permissions": ["activeTab"],
+  "host_permissions": ["https://survey.pup.edu.ph/*"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PUP SIScore"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://survey.pup.edu.ph/apps/evaluation/survey/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

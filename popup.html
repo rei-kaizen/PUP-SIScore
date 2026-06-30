@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>PUP SIScore</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      width: 320px;
+      background: #f5f5f5;
+      color: #222;
+    }
+
+    .header {
+      background: #8B0000;
+      color: #fff;
+      padding: 14px 16px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+    }
+    .header p {
+      font-size: 11px;
+      opacity: 0.8;
+      margin-top: 3px;
+    }
+
+    .body { padding: 14px 16px; }
+
+    .field { margin-bottom: 12px; }
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 5px;
+    }
+    .field input[type="number"],
+    .field select {
+      width: 100%;
+      padding: 9px 11px;
+      border: 2px solid #ddd;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #222;
+      background: #fff;
+      transition: border-color 0.15s;
+    }
+    .field input[type="number"]:focus,
+    .field select:focus {
+      outline: none;
+      border-color: #8B0000;
+    }
+
+    .or-divider {
+      text-align: center;
+      font-size: 11px;
+      color: #bbb;
+      margin: 6px 0 10px;
+      user-select: none;
+    }
+
+    .preview {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #fffbea;
+      border: 1.5px solid #FFD700;
+      border-radius: 6px;
+      padding: 8px 12px;
+      min-height: 38px;
+      margin-bottom: 14px;
+      font-size: 13px;
+      color: #555;
+    }
+    .preview .badge {
+      background: #8B0000;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      border-radius: 4px;
+      padding: 2px 7px;
+      flex-shrink: 0;
+    }
+    .preview .label { color: #333; font-weight: 600; }
+    .preview .range { color: #999; font-size: 11px; margin-left: auto; }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .btn {
+      padding: 9px;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: filter 0.15s;
+    }
+    .btn:hover { filter: brightness(0.9); }
+    .btn-apply { background: #8B0000; color: #fff; }
+    .btn-random { background: #FFD700; color: #333; }
+
+    .status {
+      font-size: 12px;
+      padding: 7px 10px;
+      border-radius: 5px;
+      text-align: center;
+      display: none;
+    }
+    .status.success { display: block; background: #e8f5e9; color: #2e7d32; }
+    .status.error   { display: block; background: #ffebee; color: #c62828; }
+
+    .scale-ref {
+      margin-top: 10px;
+      border-top: 1px solid #e0e0e0;
+      padding-top: 8px;
+    }
+    .scale-ref summary {
+      font-size: 11px;
+      color: #999;
+      cursor: pointer;
+      user-select: none;
+    }
+    .scale-ref table {
+      width: 100%;
+      margin-top: 6px;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    .scale-ref td { padding: 3px 4px; border-bottom: 1px solid #eee; }
+    .scale-ref td:first-child { font-weight: 700; color: #8B0000; width: 16px; }
+    .scale-ref td:last-child { color: #bbb; text-align: right; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>PUP SIScore</h1>
+    <p>Auto-fill evaluation survey ratings</p>
+  </div>
+
+  <div class="body">
+    <div class="field">
+      <label>Total Score</label>
+      <input type="number" id="scoreInput" placeholder="e.g. 77.33 (0–100) or 4.2 (1–5)"
+             min="0" max="100" step="0.01">
+    </div>
+
+    <div class="or-divider">— or select directly —</div>
+
+    <div class="field">
+      <label>Qualitative Description</label>
+      <select id="qualSelect">
+        <option value="">Choose a rating…</option>
+        <option value="5">5 — Always manifested (91–100%)</option>
+        <option value="4">4 — Often manifested (61–90%)</option>
+        <option value="3">3 — Sometimes manifested (31–60%)</option>
+        <option value="2">2 — Seldom manifested (11–30%)</option>
+        <option value="1">1 — Never / Rarely manifested (0–10%)</option>
+      </select>
+    </div>
+
+    <div class="preview" id="preview">
+      <span style="color:#bbb">Enter a score or pick a description above.</span>
+    </div>
+
+    <div class="buttons">
+      <button class="btn btn-apply" id="applyBtn">Apply</button>
+      <button class="btn btn-random" id="randomBtn">Randomize</button>
+    </div>
+
+    <div class="status" id="status"></div>
+
+    <details class="scale-ref">
+      <summary>Rating scale reference</summary>
+      <table>
+        <tr><td>5</td><td>Always manifested</td><td>91–100%</td></tr>
+        <tr><td>4</td><td>Often manifested</td><td>61–90%</td></tr>
+        <tr><td>3</td><td>Sometimes manifested</td><td>31–60%</td></tr>
+        <tr><td>2</td><td>Seldom manifested</td><td>11–30%</td></tr>
+        <tr><td>1</td><td>Never / Rarely manifested</td><td>0–10%</td></tr>
+      </table>
+    </details>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
