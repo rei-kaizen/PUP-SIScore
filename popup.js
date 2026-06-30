@@ -88,7 +88,7 @@ function applyScore(score) {
         return;
       }
       showStatus(
-        `✓ Applied to ${response.count} question(s) — survey will show ≈ ${response.actualScore}%.`,
+        `✓ Applied to ${response.count} questions. Survey will show ≈ ${response.actualScore}%.`,
         'success'
       );
     });
