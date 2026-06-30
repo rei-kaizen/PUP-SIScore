@@ -1,74 +1,117 @@
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.action === 'applyRating') {
-    sendResponse(applyRating(msg.rating));
-  }
-  return true; // keep port open for async sendResponse
+  if (msg.action === 'applyScore')  sendResponse(applyScore(msg.score));
+  if (msg.action === 'applyRating') sendResponse(applyUniform(msg.rating));
+  return true;
 });
 
-function applyRating(targetRating) {
-  const allRadios = Array.from(document.querySelectorAll('input[type="radio"]'));
+// --- Score-based: distribute floor/ceil values across questions ---
 
-  if (allRadios.length === 0) {
-    return { success: false, message: 'No radio buttons found on this page.' };
-  }
+function applyScore(score) {
+  const groups = getQuestionGroups();
+  if (!groups.length) return noGroupsError();
 
-  // Group by `name` attribute — each named group represents one survey question.
-  const groups = {};
-  allRadios.forEach(r => {
-    const key = r.name;
-    if (!key) return;
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(r);
-  });
+  // Linear mapping: 0% → avg 1, 100% → avg 5
+  const avg = 1 + (score / 100) * 4;
 
-  // Only consider groups that have at least 2 options (genuine question groups).
-  const questionGroups = Object.values(groups).filter(g => g.length >= 2);
-
-  if (questionGroups.length === 0) {
-    return { success: false, message: 'No question groups found — are you on the survey page?' };
-  }
+  // Assign a shuffled mix of floor(avg) and ceil(avg) so the
+  // overall distribution reflects the exact decimal score.
+  const values = distributeValues(groups.length, avg);
 
   let applied = 0;
-
-  questionGroups.forEach(radios => {
-    const target = pickRadio(radios, targetRating);
-    if (!target || target.disabled) return;
-
-    target.checked = true;
-    target.click();
-    // Fire change event for React/Vue/Angular-driven forms that suppress native events.
-    target.dispatchEvent(new Event('change', { bubbles: true }));
-    applied++;
+  groups.forEach((radios, i) => {
+    const target = pickRadio(radios, values[i]);
+    if (target && !target.disabled) { fireClick(target); applied++; }
   });
 
-  return {
-    success: applied > 0,
-    count: applied,
-    message: applied === 0 ? 'Could not select any radio buttons.' : null,
-  };
+  return applied > 0
+    ? { success: true, count: applied }
+    : { success: false, message: 'Could not select any radio buttons.' };
+}
+
+// --- Rating-based: same integer value for every question (dropdown / Randomize) ---
+
+function applyUniform(rating) {
+  const groups = getQuestionGroups();
+  if (!groups.length) return noGroupsError();
+
+  let applied = 0;
+  groups.forEach(radios => {
+    const target = pickRadio(radios, rating);
+    if (target && !target.disabled) { fireClick(target); applied++; }
+  });
+
+  return applied > 0
+    ? { success: true, count: applied }
+    : { success: false, message: 'Could not select any radio buttons.' };
+}
+
+// --- Helpers ---
+
+function getQuestionGroups() {
+  const map = {};
+  document.querySelectorAll('input[type="radio"]').forEach(r => {
+    if (!r.name) return;
+    (map[r.name] ??= []).push(r);
+  });
+  return Object.values(map).filter(g => g.length >= 2);
+}
+
+function noGroupsError() {
+  return { success: false, message: 'No question groups found — are you on the survey page?' };
 }
 
 /*
- * Three strategies, tried in order:
- *   1. Exact numeric value match (value="4" → rating 4)
- *   2. Sort all values numerically, pick by 1-based index (lowest value = 1)
- *   3. DOM order: pick the Nth element in document order
+ * Generates `count` integers (each floor(avg) or ceil(avg)) whose expected
+ * mean matches `avg`, then shuffles them so questions get varied values.
+ *
+ * Example: avg=3.8665, count=10 → 9 fours and 1 three, randomly ordered.
+ */
+function distributeValues(count, avg) {
+  avg = Math.max(1, Math.min(5, avg));
+  const lo = Math.floor(avg);
+  const hi = Math.ceil(avg);
+
+  if (lo === hi) return Array(count).fill(lo);
+
+  const hiCount = Math.round(count * (avg - lo));
+  const values  = [
+    ...Array(hiCount).fill(hi),
+    ...Array(count - hiCount).fill(lo),
+  ];
+
+  // Fisher-Yates shuffle so adjacent questions get different values.
+  for (let i = values.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [values[i], values[j]] = [values[j], values[i]];
+  }
+
+  return values;
+}
+
+/*
+ * Three strategies in priority order:
+ *   1. Exact numeric value match  (value="4")
+ *   2. Numerically sorted index   (sorted ascending, pick index rating-1)
+ *   3. DOM order fallback
  */
 function pickRadio(radios, targetRating) {
-  // Strategy 1 — value matches the rating directly
   const byValue = radios.find(r => parseFloat(r.value) === targetRating);
   if (byValue) return byValue;
 
-  // Strategy 2 — all values are numbers, sort ascending and index in
   const allNumeric = radios.every(r => !isNaN(parseFloat(r.value)));
   if (allNumeric) {
     const sorted = [...radios].sort((a, b) => parseFloat(a.value) - parseFloat(b.value));
-    if (sorted.length >= targetRating) return sorted[targetRating - 1];
+    return sorted[targetRating - 1] ?? null;
   }
 
-  // Strategy 3 — DOM order fallback
   const byDom = [...radios].sort((a, b) =>
     a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1
   );
   return byDom[targetRating - 1] ?? null;
+}
+
+function fireClick(radio) {
+  radio.checked = true;
+  radio.click();
+  radio.dispatchEvent(new Event('change', { bubbles: true }));
 }

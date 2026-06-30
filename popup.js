@@ -6,29 +6,38 @@ const RATINGS = {
   1: { label: 'Never/Rarely manifested', range: '0–10%'   },
 };
 
-// Accepts 0–100 (percentage) or 1–5 (direct scale with decimals).
-function scoreToRating(raw) {
-  const n = parseFloat(raw);
-  if (isNaN(n) || n < 0 || n > 100) return null;
-
-  if (n <= 5) {
-    // Direct 1–5 scale
-    if (n >= 4.51) return 5;
-    if (n >= 3.51) return 4;
-    if (n >= 2.51) return 3;
-    if (n >= 1.51) return 2;
-    return 1;
-  }
-
-  // Percentage 0–100
-  if (n >= 91) return 5;
-  if (n >= 61) return 4;
-  if (n >= 31) return 3;
-  if (n >= 11) return 2;
+// Score is always a percentage (0–100). No dual-mode guessing.
+function percentageToRating(pct) {
+  if (pct >= 91) return 5;
+  if (pct >= 61) return 4;
+  if (pct >= 31) return 3;
+  if (pct >= 11) return 2;
   return 1;
 }
 
-function renderPreview(rating) {
+function renderScorePreview(rawInput) {
+  const el = document.getElementById('preview');
+  const n = parseFloat(rawInput);
+
+  if (rawInput === '' || isNaN(n)) {
+    el.innerHTML = '<span style="color:#bbb">Enter a score or pick a description above.</span>';
+    return;
+  }
+  if (n < 0 || n > 100) {
+    el.innerHTML = '<span style="color:#c62828">Score must be between 0 and 100.</span>';
+    return;
+  }
+
+  const rating = percentageToRating(n);
+  const { label } = RATINGS[rating];
+  el.innerHTML = `
+    <span class="badge">${n}%</span>
+    <span class="label">${label}</span>
+    <span class="range">${rating}/5</span>
+  `;
+}
+
+function renderRatingPreview(rating) {
   const el = document.getElementById('preview');
   if (!rating) {
     el.innerHTML = '<span style="color:#bbb">Enter a score or pick a description above.</span>';
@@ -36,7 +45,7 @@ function renderPreview(rating) {
   }
   const { label, range } = RATINGS[rating];
   el.innerHTML = `
-    <span class="badge">${rating}</span>
+    <span class="badge">${rating}/5</span>
     <span class="label">${label}</span>
     <span class="range">${range}</span>
   `;
@@ -49,44 +58,52 @@ function showStatus(msg, type) {
   if (type === 'success') setTimeout(() => { el.className = 'status'; }, 3500);
 }
 
-// --- Input listeners ---
+// --- Input listeners (mutually exclusive) ---
 
 document.getElementById('scoreInput').addEventListener('input', e => {
   document.getElementById('qualSelect').value = '';
-  renderPreview(scoreToRating(e.target.value));
+  renderScorePreview(e.target.value);
 });
 
 document.getElementById('qualSelect').addEventListener('change', e => {
   document.getElementById('scoreInput').value = '';
-  renderPreview(e.target.value ? parseInt(e.target.value) : null);
+  renderRatingPreview(e.target.value ? parseInt(e.target.value) : null);
 });
 
 // --- Buttons ---
 
 document.getElementById('applyBtn').addEventListener('click', () => {
-  const qual   = document.getElementById('qualSelect').value;
-  const score  = document.getElementById('scoreInput').value;
+  const scoreRaw = document.getElementById('scoreInput').value;
+  const qual     = document.getElementById('qualSelect').value;
 
-  let rating = null;
-  if (qual)               rating = parseInt(qual);
-  else if (score !== '')  rating = scoreToRating(score);
+  if (qual) {
+    sendMessage({ action: 'applyRating', rating: parseInt(qual) });
+    return;
+  }
 
-  if (!rating) {
+  if (scoreRaw === '') {
     showStatus('Enter a score or select a description first.', 'error');
     return;
   }
-  dispatch(rating);
+
+  const score = parseFloat(scoreRaw);
+  if (isNaN(score) || score < 0 || score > 100) {
+    showStatus('Score must be a number between 0 and 100.', 'error');
+    return;
+  }
+
+  sendMessage({ action: 'applyScore', score });
 });
 
 document.getElementById('randomBtn').addEventListener('click', () => {
   const rating = Math.floor(Math.random() * 5) + 1;
-  renderPreview(rating);
-  dispatch(rating);
+  renderRatingPreview(rating);
+  sendMessage({ action: 'applyRating', rating });
 });
 
 // --- Messaging ---
 
-function dispatch(rating) {
+function sendMessage(payload) {
   chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
     const tab = tabs[0];
 
@@ -95,18 +112,28 @@ function dispatch(rating) {
       return;
     }
 
-    chrome.tabs.sendMessage(tab.id, { action: 'applyRating', rating }, response => {
+    chrome.tabs.sendMessage(tab.id, payload, response => {
       if (chrome.runtime.lastError) {
         showStatus('Cannot reach the survey page — try refreshing it.', 'error');
         return;
       }
-      if (response?.success) {
+
+      if (!response?.success) {
+        showStatus(response?.message || 'No radio buttons found on this page.', 'error');
+        return;
+      }
+
+      if (payload.action === 'applyScore') {
+        const rating = percentageToRating(payload.score);
         showStatus(
-          `✓ Applied "${RATINGS[rating].label}" (${rating}/5) to ${response.count} question(s).`,
+          `✓ ${payload.score}% → "${RATINGS[rating].label}" applied to ${response.count} question(s).`,
           'success'
         );
       } else {
-        showStatus(response?.message || 'No radio buttons found on this page.', 'error');
+        showStatus(
+          `✓ "${RATINGS[payload.rating].label}" (${payload.rating}/5) applied to ${response.count} question(s).`,
+          'success'
+        );
       }
     });
   });
