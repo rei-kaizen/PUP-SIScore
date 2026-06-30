@@ -10,8 +10,8 @@ function applyScore(score) {
   const groups = getQuestionGroups();
   if (!groups.length) return noGroupsError();
 
-  // Linear mapping: 0% → avg 1, 100% → avg 5
-  const avg = 1 + (score / 100) * 4;
+  // Survey score formula: displayed% = avg × 20, so avg = score / 20.
+  const avg = score / 20;
 
   // Assign a shuffled mix of floor(avg) and ceil(avg) so the
   // overall distribution reflects the exact decimal score.
@@ -63,8 +63,6 @@ function noGroupsError() {
 /*
  * Generates `count` integers (each floor(avg) or ceil(avg)) whose expected
  * mean matches `avg`, then shuffles them so questions get varied values.
- *
- * Example: avg=3.8665, count=10 → 9 fours and 1 three, randomly ordered.
  */
 function distributeValues(count, avg) {
   avg = Math.max(1, Math.min(5, avg));
